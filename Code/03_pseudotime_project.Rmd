@@ -49,11 +49,14 @@ devtools::install_github('cole-trapnell-lab/monocle3')
 
 ```{r message = FALSE}
 # Load required libraries
+
+rm(list = ls())
 library(monocle3)
 library(Seurat)
 library(SeuratWrappers)
 library(ggplot2)
 library(scRNAseq)
+library(SingleCellExperiment)
 library(dplyr) 
 ```
 
@@ -64,12 +67,33 @@ The `scRNAseq` package is a Bioconductor resource that provides access to a coll
 
 For this tutorial, we will use the hematopoietic stem cell (HSC) dataset from [(Nestorowa et al., 2016)](https://ashpublications.org/blood/article/128/8/e20/35749/A-single-cell-resolution-map-of-mouse), which captures transcriptional profiles of mouse haematopoietic stem and progenitor cells (HSPCs). This dataset is ideal for trajectory inference because it represents a dynamic biological process: the differentiation of stem cells into various blood cell lineages.
 
+```{r}
+
+```
+
 
 ## Load dataset
 
 ```{r message = FALSE}
 #This step can take a bit longer
+rm(list = ls())
+
+remotes::install_github("LTLA/scRNAseq")
+
+remove.packages("AnnotationHub")
+BiocManager::install("AnnotationHub", force = TRUE)
+# Delete the local AnnotationHub cache entirely
+ah_cache <- tools::R_user_dir("AnnotationHub", which = "cache")
+unlink(ah_cache, recursive = TRUE)
+
+# Same for ExperimentHub
+eh_cache <- tools::R_user_dir("ExperimentHub", which = "cache")
+unlink(eh_cache, recursive = TRUE)
+
+# Restart R, then retry
+library(scRNAseq)
 sce <- NestorowaHSCData()
+#sce <- NestorowaHSCData()
 
 #Create seurat object
 seurat <- CreateSeuratObject(counts = counts(sce), meta.data = as.data.frame(colData(sce)))
