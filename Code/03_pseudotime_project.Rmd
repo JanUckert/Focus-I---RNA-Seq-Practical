@@ -1,7 +1,7 @@
 ---
 title: "Inferring single cell trajectories"
 date: "`r Sys.Date()`"
-author: "Team name"
+author: "JaLeKa"
 output:
   BiocStyle::html_document:
     toc: true
@@ -41,6 +41,9 @@ BiocManager::install(c('BiocGenerics', 'DelayedArray', 'DelayedMatrixStats',
                        'ggrastr', 'Seurat', 'dplyr', 'ggplot2','scRNAseq',
                        'satijalab/seurat-wrappers'), dependencies = TRUE)
 
+BiocManager::install(c("scRNAseq", "ExperimentHub", "BiocFileCache", "HDF5Array"), 
+                     force = TRUE)
+
 install.packages("devtools")
 remotes::install_github("bnprks/BPCells/r")
 devtools::install_github('cole-trapnell-lab/monocle3')
@@ -70,6 +73,8 @@ For this tutorial, we will use the hematopoietic stem cell (HSC) dataset from [(
 ```{r message = FALSE}
 #This step can take a bit longer
 sce <- NestorowaHSCData()
+
+
 
 #Create seurat object
 seurat <- CreateSeuratObject(counts = counts(sce), meta.data = as.data.frame(colData(sce)))
