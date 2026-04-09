@@ -93,7 +93,44 @@ Questions:
 Suggestion: Inspect unique values in each categorical column and check the paper [paper](https://ashpublications.org/blood/article/128/8/e20/35749/A-single-cell-resolution-map-of-mouse) for specific terms.
 3) How many cells per cell type were measured considering broad gating? And considering narrow gating? 
 
+```{r taking a look at the dataset, gaining information about metadata}
 
+#1)
+seurat
+head(seurat)
+dim(seurat)
+
+#2)
+seurat@meta.data
+colnames(seurat@meta.data)
+
+#3)
+#broad:
+seurat@meta.data %>%
+  group_by(broad) %>%
+  summarise(celltype = n())
+
+#alternative:
+#seurat@meta.data %>%
+#  group_by(broad) %>% 
+#  tally()
+
+#fine:
+seurat@meta.data %>%
+  group_by(fine) %>%
+  summarise(celltype = n())
+
+#alternative:
+#seurat@meta.data %>%
+#  group_by(fine) %>% 
+#  tally()
+
+```
+1) 46 078 features (genes) and 1920 samples (cells)
+
+2): orig.ident: sample identity (which sorting gate batch the cell came from), nCount_RNA: reads of RNA per Cell, nFeature_RNA: genes, gate: borad sorting gate, broad: broad gating sorting of the cell types, broad.mpp: higher resolved cell types of MPPs, fine: NArrow gating populations, fine.mpp:, ESLAM: whether cells fall into ESLAM gate, HSC1: specific cell type?, projected: Cell type label assigned computationally by projection, rest: quality measures: reads that aligned to genome but where the genome regions are not annotated, reads that span several genes, reads that fit several regions and couldnt be assigned clearly, reads that got low alignment scores, didnt get aligned at all, 
+
+3) s. above
 
 ## QC metrics
 
@@ -109,6 +146,13 @@ nCount_RNA:
 Minimum: ≥1,000–10,000 (to exclude low-quality cells)
 
 
+```{r look at QC metrics using Violin plots}
+
+VlnPlot(seurat, features = "nFeature_RNA") +
+VlnPlot(seurat, features = "nCount_RNA", log = T)
+
+```
+-> Looks good: nFeature starts at 5000 genes, nCount starts at 10 000
 
 
 ## Process and visualize data
@@ -117,11 +161,56 @@ So far, we have already a first view on our data, but before proceeding to traje
 
 **Task 3: Use Seurat to process the count data (normalization and scaling), find the most highly variable genes, and perform dimensionality reduction (PCA and UMAP)**
 
+```{r Normalization, Scaling, HVG, dim reduction (PCA & UMAP)}
+
+seurat <- NormalizeData(seurat)
+
+seurat <- FindVariableFeatures(seurat, nfeatures = 2000)
+
+top_genes <- head(VariableFeatures(seurat), 20)
+all_genes <- rownames (seurat)
+
+#Scaling is based on the relation between genes, so need to specify which genes should be scaled
+seurat <- ScaleData(seurat, features= all_genes)
+
+seurat <- RunPCA(seurat, verbose = T)
+
+ElbowPlot(seurat)
+
+
+#20n pcs
+seurat <- FindNeighbors(seurat, dims = 1:20, verbose = T)
+
+seurat <- FindClusters(seurat, resolution = 0.5)
+
+seurat <- RunUMAP(seurat, dims = 1:20)
+
+```
 
 
 **Task 4: Plot the PCA and UMAP. Try coloring different groups. What is captured by the first principal components? How many components would you look at? Do you see a separation of the different cell populations and cell types in the plots? What can you conclude from these plots? Can you already identify some differentiation patterns? **
 
+```{r}
 
+DimPlot(seurat, reduction = "umap") +
+DimPlot(seurat, reduction = "umap", group.by = "gate") +
+DimPlot(seurat, reduction = "umap", group.by = "broad") +
+DimPlot(seurat, reduction = "umap", group.by = "fine")
+
+
+#Look for how much variance the PCs cover
+#cumulative sum of all variances
+csVar <- cumsum(seurat@reductions$pca@stdev ^ 2 / sum(seurat@reductions$pca@stdev ^ 2) * 100)
+
+#take names 1:50 for this vector (= number the PCAs from 1 to 50)
+names(csVar) <- 1:length(csVar) 
+
+#look for PCAs that cover a variance of at least 90%
+names(csVar[csVar>90])
+
+
+```
+1) 17%, at best you would use at least 42 components, we used 20. Yes, you can see a cell type difference base don the UMAP clusters that correlate to "broad" and "fine" celltypes, though the UMAP divides CMP in two clusters.
 
 # Part 2 - Mini-projects
 
@@ -132,6 +221,17 @@ Monocle3 implements a powerful framework for trajectory inference that can captu
 4.) Computing pseudotime
 
 In this part, each group will apply the general Monocle3 workflow and then focus on one specific aspect of the analysis. The goal is to explore the data more independently, generate a small set of results, and interpret them biologically. Each group should prepare 2 key plots to show to everyone at the end of the day.
+
+
+```{r}
+
+cds
+cds <- preprocess_cds(cds, num_dim = 100)
+cds <- align_cds(cds, alignment_group = "batch")
+
+
+```
+
 
 **Topic 1 (Groups 1 & 2): Marker genes and cluster characterization**
 Identify the top marker genes for each cluster and explore how well they define distinct cell populations.
@@ -162,6 +262,7 @@ Suggested steps:
 - Use graph_test() to identify genes associated with pseudotime
 - Select the top ~5 genes based on statistical significance
 - Visualize their expression along pseudotime (e.g. plot_genes_in_pseudotime())
+
 Questions to consider:
 - Do genes show clear trends (e.g. increasing, decreasing, transient expression)?
 - Are there differences between branches or cell types?
@@ -202,6 +303,66 @@ cds2<- new_cell_data_set(expression_matrix,
 
 #Remove no longer necessary objects 
 rm(expression_matrix, cell_metadata, gene_metadata)
+```
+
+
+**We are Group 6.**
+
+```{r Group 6 preprocessing}
+
+#preprocessing
+cds <- preprocess_cds(cds, num_dim = 100)
+
+#reduce dimensions
+cds <- reduce_dimension(
+  cds,
+  reduction_method = "UMAP",
+  umap.min_dist = 0.1,      
+  umap.n_neighbors = 30         
+)
+
+#cluster cells
+cds <- cluster_cells(cds, resolution = 1e-2,
+                     k = 10,)
+
+#plot cells
+
+
+#learn graph?
+cds <- learn_graph(cds)
+
+plot_cells(cds, color_cells_by = "gate",
+           label_cell_groups= FALSE,
+           label_groups_by_cluster = FALSE, 
+           label_leaves = FALSE,
+           cell_size = 1)
+
+plot_cells(cds, color_cells_by = "partition",
+           label_cell_groups= FALSE,
+           label_groups_by_cluster = FALSE, 
+           label_leaves = FALSE,
+           cell_size = 1)
+
+cds <- order_cells(cds)
+
+plot_cells(cds,
+           color_cells_by = "pseudotime",
+           label_cell_groups=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE,
+           graph_label_size=1.5,
+           cell_size = 1)
+
+unique(colData(cds)$broad)
+
+cds_sub <- cds [, colData(cds)$broad %in% c("LTHSC", "MPP", "CMP")]
+
+cds_sub <- preprocess_cds(cds_sub, num_dim = 30) %>% 
+  reduce_dimension(umap.n_neighbors = 30L,
+                   umap.min_dist = 0.4) %>% 
+  cluster_cells(resolution = 1e-3)
+
+
 ```
 
 
