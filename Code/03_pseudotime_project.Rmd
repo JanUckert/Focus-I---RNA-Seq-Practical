@@ -293,8 +293,58 @@ plot_cells(cds, color_cells_by = "broad",
 
 sub_cds <- cds[,colData(cds)$broad %in% c("LTHSC","MPP","CMP")]
 
+sub_cds <- preprocess_cds(sub_cds, num_dim = 100)
+sub_cds <- reduce_dimension(sub_cds, reduction_method = "UMAP")
+sub_cds <- cluster_cells(sub_cds, reduction_method = "UMAP")
+sub_cds <- learn_graph(sub_cds)
+
+plot_cells(sub_cds, color_cells_by = "broad",
+           label_cell_groups= FALSE,
+           label_groups_by_cluster = FALSE, 
+           label_leaves = FALSE,
+           cell_size = 0.5,
+           reduction_method = "UMAP")
+
+sub_cds <- order_cells(sub_cds)
+
+genes_out <- graph_test(sub_cds)
+
+TopGenes <- genes_out %>%
+  filter(status == "OK") %>%
+  filter(q_value > 0) %>%
+  arrange(q_value) %>%
+  slice_head(n=100) %>%
+  pull(gene_short_name)
+
+TopAltGenes <- genes_out %>%
+  filter(status == "OK") %>%
+  filter(q_value > 0) %>%
+  arrange(p_value) %>%
+  slice_head(n=100) %>%
+  pull(gene_short_name)
+
+saveRDS(genes_out, file = '/Users/Shared/GitHub/Focus I - RNA Seq Practical/Results/graphTestOut.RDS')
+saveRDS(TopGenes, file = '/Users/Shared/GitHub/Focus I - RNA Seq Practical/Results/TopGenes.RDS')
+
 ```
 
+
+```{r}
+
+TopGenes <- TopGenes[1:5]
+
+plot_cells(sub_cds, genes = TopAltGenes,
+           label_cell_groups= FALSE,
+           label_groups_by_cluster = FALSE, 
+           label_leaves = FALSE,
+           cell_size = 0.5,
+           reduction_method = "UMAP")
+
+gene_sub <- sub_cds[rowData(sub_cds)$gene_short_name %in% TopGenes,]
+
+plot_genes_in_pseudotime(sub_cds)
+
+```
 
 
 # sessionInfo
