@@ -1,2 +1,3 @@
-# Focus I - RNA Seq Practical JaLeKa
+# Focus I - RNA Seq Practical
+Jan Uckert & Lea Schmeilzl & Katina Gassen
 
