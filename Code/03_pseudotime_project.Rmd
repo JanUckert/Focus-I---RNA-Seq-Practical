@@ -41,6 +41,8 @@ BiocManager::install(c('BiocGenerics', 'DelayedArray', 'DelayedMatrixStats',
                        'ggrastr', 'Seurat', 'dplyr', 'ggplot2','scRNAseq',
                        'satijalab/seurat-wrappers'), dependencies = TRUE)
 
+BiocManager::install('satijalab/seurat-wrappers', dependencies = TRUE)
+
 install.packages("devtools")
 remotes::install_github("bnprks/BPCells/r")
 devtools::install_github('cole-trapnell-lab/monocle3')
@@ -51,7 +53,7 @@ devtools::install_github('cole-trapnell-lab/monocle3')
 # Load required libraries
 library(monocle3)
 library(Seurat)
-library(SeuratWrappers)
+library(SeuratWrappers) #
 library(ggplot2)
 library(scRNAseq)
 library(dplyr) 
@@ -68,6 +70,25 @@ For this tutorial, we will use the hematopoietic stem cell (HSC) dataset from [(
 ## Load dataset
 
 ```{r message = FALSE}
+rm(list = ls())
+
+remotes::install_github("LTLA/scRNAseq")
+
+remove.packages("AnnotationHub")
+BiocManager::install("AnnotationHub", force = TRUE)
+# Delete the local AnnotationHub cache entirely
+ah_cache <- tools::R_user_dir("AnnotationHub", which = "cache")
+unlink(ah_cache, recursive = TRUE)
+
+# Same for ExperimentHub
+eh_cache <- tools::R_user_dir("ExperimentHub", which = "cache")
+unlink(eh_cache, recursive = TRUE)
+
+# Restart R, then retry
+library(scRNAseq)
+sce <- NestorowaHSCData()
+
+
 #This step can take a bit longer
 sce <- NestorowaHSCData()
 
@@ -81,11 +102,37 @@ rm(sce)
 ## Explore data
 
 **Task 1: Let's first explore the Seurat object we just created.** 
+```{r}
+dim(seurat)
+seurat
+#number cells and genes
+seurat@meta.data
+colnames(seurat@meta.data)
+
+table(seurat@meta.data$broad)
+seurat@meta.data %>% 
+  group_by(broad) %>% 
+  tally()
+
+table(seurat@meta.data$fine)
+seurat@meta.data %>% 
+  group_by(fine) %>% 
+  tally()
+
+```
+
 
 Questions:
 1) How many cells and genes are included?
+  There are 46078 features (genes) and 1920 samples (cells)
 2) Which information is contained in the metadata? Try to find out the meaning of each column.
-Suggestion: Inspect unique values in each categorical column and check the paper [paper](https://ashpublications.org/blood/article/128/8/e20/35749/A-single-cell-resolution-map-of-mouse) for specific terms.
+Suggestion: Inspect unique values in each categorical column and check the paper
+[paper](https://ashpublications.org/blood/article/128/8/e20/35749/A-single-cell-resolution-map-of-mouse) for specific terms.
+  This is a facs sorted hematopoetic single cell data set. Gate and orig idents are the first sorting of celltypes, then broad is a broader gated facs sorting and fine is another sorting
+  Total number RNA count (UMI) per cell
+  Total number of unique genes per cel
+  gate: Fluorescent activated cell sorting (FACs)
+
 3) How many cells per cell type were measured considering broad gating? And considering narrow gating? 
 
 
@@ -95,6 +142,14 @@ Suggestion: Inspect unique values in each categorical column and check the paper
 Some pre-processing steps were already performed by the authors, specifically to exclude low-quality cells. Before starting the analysis, let's perform some additional quality control checks to ensure the data meet the expected QC thresholds.
 
 **Task 2: Confirm that the distribution of QC metrics (nFeature_RNA and nCount_RNA) meet the required QC thresholds. Visualize their distribution using violin plots. **
+```{r}
+nFeature_RNA
+nCount_RNA
+
+VlnPlot(seurat, features = "nFeature_RNA", group.by = "gate") 
+VlnPlot(seurat, features = "nCount_RNA", group.by = "gate")
+```
+
 
 Typical thresholds used in single-cell RNA-seq QC:
 nFeature_RNA:
@@ -111,10 +166,37 @@ Minimum: ≥1,000–10,000 (to exclude low-quality cells)
 So far, we have already a first view on our data, but before proceeding to trajectory analysis, let's first process the data using Seurat and visualize the gene expression profiles of all cells. For this, the data has to be normalized first following the standard Seurat processing pipeline.
 
 **Task 3: Use Seurat to process the count data (normalization and scaling), find the most highly variable genes, and perform dimensionality reduction (PCA and UMAP)**
+```{r}
+seurat <- NormalizeData(seurat)
+seurat <- FindVariableFeatures(seurat, nfeatures = 2000)
+seurat <- ScaleData(seurat)
+
+seurat <- RunPCA(seurat, verbose = F)
+ElbowPlot(seurat)
+
+seurat <- FindNeighbors(seurat, dims = 1:20)
+seurat <- FindClusters(seurat, resolution = 0.6)
+
+seurat <- RunUMAP(seurat, dims = 1:20,  verbose = F)
+
+DimPlot(seurat, reduction = "umap")
+#20 pcas
+```
 
 
 
 **Task 4: Plot the PCA and UMAP. Try coloring different groups. What is captured by the first principal components? How many components would you look at? Do you see a separation of the different cell populations and cell types in the plots? What can you conclude from these plots? Can you already identify some differentiation patterns? **
+```{r}
+DimPlot(seurat, reduction = "pca", group.by = "gate")
+DimPlot(seurat, reduction = "pca", group.by = "broad")
+ElbowPlot(seurat)
+#look at ca. 10 pcas according to the 
+
+DimPlot(seurat, reduction = "umap", group.by = "gate")
+DimPlot(seurat, reduction = "umap", group.by = "broad")
+DimPlot(seurat, reduction = "umap", group.by = "fine")
+
+```
 
 
 
@@ -197,6 +279,135 @@ cds2<- new_cell_data_set(expression_matrix,
 
 #Remove no longer necessary objects 
 rm(expression_matrix, cell_metadata, gene_metadata)
+```
+
+
+##Group 6
+Gene Dynamic across pseudotime
+Identify genes whose expression changes along differentiation trajectories.
+Suggested steps:
+- Select a subset of cells (e.g. one lineage or branch)
+- Use graph_test() to identify genes associated with pseudotime
+- Select the top ~5 genes based on statistical significance
+- Visualize their expression along pseudotime (e.g. plot_genes_in_pseudotime())
+Questions to consider:
+- Do genes show clear trends (e.g. increasing, decreasing, transient expression)?
+- Are there differences between branches or cell types?
+- Are any of these genes known to play a role in hematopoiesis?
+
+```{r Task Group 6}
+##Preprocessing
+cds <- preprocess_cds(cds, num_dim = 100)
+cds <- reduce_dimension(cds)
+cds <- cluster_cells(cds, resolution = 0.01)
+
+##Order cells along a pseudotime trajecotry
+# Learn a graph
+cds <- learn_graph(cds)
+
+## Order cells
+cds <- order_cells(cds)
+
+plot_cells(cds)
+
+plot_cells(cds, label_groups_by_cluster=FALSE,  color_cells_by = "broad", cell_size=1, graph_label_size=1.5) 
+
+plot_cells(cds,
+           color_cells_by = "pseudotime",
+           label_cell_groups=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE,
+           graph_label_size=1.5,
+           cell_size=1)
+
+#look a celltypes
+unique(seurat@meta.data$broad)
+
+cds_sub <-  cds[,colData(cds)$broad %in% c("LTHSC", "MPP", "CMP")]
+cds_sub <- preprocess_cds(cds_sub, num_dim = 100) 
+cds_sub <- reduce_dimension(cds_sub)
+cds_sub <- cluster_cells(cds_sub, resolution = 1e-3)
+
+cds_sub <- learn_graph(cds_sub)
+cds_sub <- order_cells(cds_sub)
+
+plot_cells(cds_sub, color_cells_by = "broad", cell_size=1)
+
+#Find top genes -> run by Jan 
+graph_test_cds_sub<- graph_test(cds_sub, neighbor_graph="principal_graph", cores=4)
+ids_cds_sub <- row.names(subset(pr_graph_test_res, q_value < 0.05))
+gene_module_df <- find_gene_modules(cds_sub[ids_cds_sub,], resolution=c(10^seq(-6,-1)))
+
+#Load top gene sorted by pseutotime
+graphTestOut <- readRDS("graphTestOut.RDS")
+
+Top_5 <- graphTestOut %>% 
+  filter("q_value" > 0) %>% 
+  filter(status == "OK") %>%
+  arrange(q_value) %>% 
+  slice_head(n=5) %>%
+  pull(gene_short_name)
+
+gene_sub <- cds_sub[rowData(cds_sub)$gene_short_name %in% Top_5,]
+plot_genes_in_pseudotime(gene_sub)
+
+```
+
+Leas Code
+```{r Leas code}
+#preprocessing
+cds <- preprocess_cds(cds, num_dim = 100)
+
+#reduce dimensions
+cds <- reduce_dimension(
+  cds,
+  reduction_method = "UMAP",
+  umap.min_dist = 0.1,      
+  umap.n_neighbors = 30         
+)
+
+#cluster cells
+cds <- cluster_cells(cds, resolution = 1e-2,
+                     k = 10)
+
+##plot cells
+
+
+#learn graph?
+cds <- learn_graph(cds)
+
+plot_cells(cds, color_cells_by = "gate",
+           label_cell_groups= FALSE,
+           label_groups_by_cluster = FALSE, 
+           label_leaves = FALSE,
+           cell_size = 1)
+
+plot_cells(cds, color_cells_by = "partition",
+           label_cell_groups= FALSE,
+           label_groups_by_cluster = FALSE, 
+           label_leaves = FALSE,
+           cell_size = 1)
+
+cds <- order_cells(cds)
+
+plot_cells(cds,
+           color_cells_by = "pseudotime",
+           label_cell_groups=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE,
+           graph_label_size=1.5,
+           cell_size = 1)
+
+unique(colData(cds)$broad)
+
+cds_sub <- cds [, colData(cds)$broad %in% c("LTHSC", "MPP", "CMP")]
+
+cds_sub <- preprocess_cds(cds_sub, num_dim = 30) %>% 
+  reduce_dimension(umap.n_neighbors = 30L,
+                   umap.min_dist = 0.4) %>% 
+  cluster_cells(resolution = 1e-3)
+
+
 ```
 
 
