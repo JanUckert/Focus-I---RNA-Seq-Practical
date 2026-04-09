@@ -1,2 +1,2 @@
-# Focus I - RNA Seq Practical
+# Focus I - RNA Seq Practical JaLeKa
 
