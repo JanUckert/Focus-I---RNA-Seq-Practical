@@ -47,18 +47,7 @@ devtools::install_github('cole-trapnell-lab/monocle3')
 
 ```
 
-```{r message = FALSE}
-# Load required libraries
 
-rm(list = ls())
-library(monocle3)
-library(Seurat)
-library(SeuratWrappers)
-library(ggplot2)
-library(scRNAseq)
-library(SingleCellExperiment)
-library(dplyr) 
-```
 
 
 # Part 1 - Processing and exploring the data
@@ -93,13 +82,20 @@ unlink(eh_cache, recursive = TRUE)
 # Restart R, then retry
 library(scRNAseq)
 sce <- NestorowaHSCData()
-#sce <- NestorowaHSCData()
+
+# Load required libraries
+library(monocle3)
+library(Seurat)
+library(SeuratWrappers)
+library(ggplot2)
+library(SingleCellExperiment)
+library(dplyr) 
 
 #Create seurat object
 seurat <- CreateSeuratObject(counts = counts(sce), meta.data = as.data.frame(colData(sce)))
 
 #Remove no longer necessary object
-rm(sce)
+rm(list = c("ah_cache", "eh_cache", "sce"))
 ```
 
 ## Explore data
@@ -112,6 +108,14 @@ Questions:
 Suggestion: Inspect unique values in each categorical column and check the paper [paper](https://ashpublications.org/blood/article/128/8/e20/35749/A-single-cell-resolution-map-of-mouse) for specific terms.
 3) How many cells per cell type were measured considering broad gating? And considering narrow gating? 
 
+```{r}
+length(Features(seurat))
+length(Cells(seurat))
+
+dim(seurat)
+
+
+```
 
 
 ## QC metrics
@@ -127,6 +131,12 @@ Minimum: ≥500 (to exclude low-quality cells with few detected genes)
 nCount_RNA:
 Minimum: ≥1,000–10,000 (to exclude low-quality cells)
 
+```{r}
+
+VlnPlot(seurat, features = "nFeature_RNA") +
+  VlnPlot(seurat, features = "nCount_RNA", log = TRUE)
+
+```
 
 
 
@@ -136,10 +146,42 @@ So far, we have already a first view on our data, but before proceeding to traje
 
 **Task 3: Use Seurat to process the count data (normalization and scaling), find the most highly variable genes, and perform dimensionality reduction (PCA and UMAP)**
 
+```{r}
+seurat <- NormalizeData(seurat)
+
+seurat <- FindVariableFeatures(seurat, nfeatures = 2000)
+
+top_genes <- head(VariableFeatures(seurat), 5)
+all_genes <- rownames(seurat)
+
+seurat <- ScaleData(seurat, features = all_genes)
+
+seurat <- RunPCA(seurat, verbose = TRUE)
+
+csVar <- cumsum(seurat@reductions$pca@stdev ^ 2 / sum(seurat@reductions$pca@stdev ^ 2) * 100)
+names(csVar) <- 1:length(csVar) 
+names(csVar[csVar>90])
+
+seurat <- FindNeighbors(seurat, dims = 1:20, verbose = T)
+
+seurat <- FindClusters(seurat)
+
+seurat <- RunUMAP(seurat, dims = 1:20)
+
+DimPlot(seurat, reduction = "umap")
+
+```
+
 
 
 **Task 4: Plot the PCA and UMAP. Try coloring different groups. What is captured by the first principal components? How many components would you look at? Do you see a separation of the different cell populations and cell types in the plots? What can you conclude from these plots? Can you already identify some differentiation patterns? **
 
+```{r}
+
+DimPlot(seurat, reduction = "umap") +
+  DimPlot(seurat, reduction = "pca")
+
+```
 
 
 # Part 2 - Mini-projects
@@ -174,17 +216,7 @@ Questions to consider:
 - What changes when graph pruning is turned off?
 - How does the choice of root node affect pseudotime interpretation? Based on biological knowledge, what would be a reasonable root cell population?
 
-**Topic 3 (Groups 5 & 6): Gene expression dynamics along pseudotime**
-Identify genes whose expression changes along differentiation trajectories.
-Suggested steps:
-- Select a subset of cells (e.g. one lineage or branch)
-- Use graph_test() to identify genes associated with pseudotime
-- Select the top ~5 genes based on statistical significance
-- Visualize their expression along pseudotime (e.g. plot_genes_in_pseudotime())
-Questions to consider:
-- Do genes show clear trends (e.g. increasing, decreasing, transient expression)?
-- Are there differences between branches or cell types?
-- Are any of these genes known to play a role in hematopoiesis?
+
 
 
 ## Convert Seurat object to Monocle
@@ -222,6 +254,38 @@ cds2<- new_cell_data_set(expression_matrix,
 #Remove no longer necessary objects 
 rm(expression_matrix, cell_metadata, gene_metadata)
 ```
+
+# Project:
+
+**Topic 3 (Groups 5 & 6): Gene expression dynamics along pseudotime**
+Identify genes whose expression changes along differentiation trajectories.
+Suggested steps:
+- Select a subset of cells (e.g. one lineage or branch)
+- Use graph_test() to identify genes associated with pseudotime
+- Select the top ~5 genes based on statistical significance
+- Visualize their expression along pseudotime (e.g. plot_genes_in_pseudotime())
+Questions to consider:
+- Do genes show clear trends (e.g. increasing, decreasing, transient expression)?
+- Are there differences between branches or cell types?
+- Are any of these genes known to play a role in hematopoiesis?
+
+
+```{r}
+## Preprocess
+cds <- preprocess_cds(cds, num_dim = 100)
+
+## Reduce the dimensions using UMAP
+cds <- reduce_dimension(cds)
+
+##Cluster the cells
+cds <- cluster_cells(cds)
+
+cds <- learn_graph(cds)
+
+plot_cells(cds, color_cells_by = "broad")
+
+```
+
 
 
 # sessionInfo
