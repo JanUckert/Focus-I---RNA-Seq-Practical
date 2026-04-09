@@ -1,0 +1,82 @@
+---
+title: "Pseudotime project clean"
+output: html_document
+date: "2026-04-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Run this to install packages:
+{
+if (!require("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager")
+}
+
+## Install necessary packages
+BiocManager::install(c('BiocGenerics', 'DelayedArray', 'DelayedMatrixStats',
+                       'limma', 'lme4', 'S4Vectors', 'SingleCellExperiment',
+                       'SummarizedExperiment', 'batchelor', 'HDF5Array',
+                       'ggrastr', 'Seurat', 'dplyr', 'ggplot2','scRNAseq',
+                       'satijalab/seurat-wrappers'), dependencies = TRUE)
+
+install.packages("devtools")
+remotes::install_github("bnprks/BPCells/r")
+devtools::install_github('cole-trapnell-lab/monocle3')
+
+
+remotes::install_github("LTLA/scRNAseq")
+
+remove.packages("AnnotationHub")
+BiocManager::install("AnnotationHub", force = TRUE)
+## Delete the local AnnotationHub cache entirely
+ah_cache <- tools::R_user_dir("AnnotationHub", which = "cache")
+unlink(ah_cache, recursive = TRUE)
+
+## Same for ExperimentHub
+eh_cache <- tools::R_user_dir("ExperimentHub", which = "cache")
+unlink(eh_cache, recursive = TRUE)
+
+# Project
+
+```{r message = FALSE}
+#This step can take a bit longer
+rm(list = ls())
+
+# Restart R, then retry
+library(scRNAseq)
+sce <- NestorowaHSCData()
+
+# Load required libraries
+library(monocle3)
+library(Seurat)
+library(SeuratWrappers)
+library(ggplot2)
+library(SingleCellExperiment)
+library(dplyr) 
+
+#Create seurat object
+seurat <- CreateSeuratObject(counts = counts(sce), meta.data = as.data.frame(colData(sce)))
+
+#Remove no longer necessary object
+rm(list = c("ah_cache", "eh_cache", "sce"))
+```
+
+# Seurat Object Processing
+```{r}
+seurat <- NormalizeData(seurat)
+seurat <- FindVariableFeatures(seurat, nfeatures = 2000)
+seurat <- ScaleData(seurat, features = all_genes)
+seurat <- RunPCA(seurat, verbose = TRUE)
+seurat <- FindNeighbors(seurat, dims = 1:20, verbose = T)
+seurat <- FindClusters(seurat)
+seurat <- RunUMAP(seurat, dims = 1:20)
+```
+
+# Conversion to 
+```{r}
+
+```
+
+
