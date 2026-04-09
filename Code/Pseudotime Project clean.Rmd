@@ -143,6 +143,13 @@ plot_cells(sub_cds, color_cells_by = "broad",
            label_groups_by_cluster = FALSE, 
            label_leaves = FALSE,
            cell_size = 0.5,
+           reduction_method = "UMAP") +
+
+plot_cells(sub_cds, color_cells_by = "pseudotime",
+           label_cell_groups= FALSE,
+           label_groups_by_cluster = FALSE, 
+           label_leaves = FALSE,
+           cell_size = 0.5,
            reduction_method = "UMAP")
 ```
 
@@ -157,7 +164,6 @@ sub_cds <- order_cells(sub_cds)
 genes_out_new <- readRDS('/Users/Shared/GitHub/Focus I - RNA Seq Practical/Results/genes_out_new.RDS')
 saveRDS(genes_out_new, file = '/Users/Shared/GitHub/Focus I - RNA Seq Practical/Results/genes_out_new.RDS')
 
-hvg <- VariableFeatures(seurat) 
 
 
 TopGenes <- genes_out_new %>%
@@ -172,9 +178,9 @@ TopGenes
 
 # Plotting marker genes
 ```{r}
-gene_sub <- sub_cds[rowData(sub_cds)$gene_short_name %in% TopGenes,]
+gene_sub <- sub_cds[rowData(sub_cds)$gene_short_name %in% "ENSMUSG00000027611",]
 
-plot_cells(sub_cds, genes = TopGenes,
+plot_cells(sub_cds, genes = "ENSMUSG00000027611",
            label_cell_groups= FALSE,
            label_groups_by_cluster = FALSE, 
            label_leaves = FALSE,

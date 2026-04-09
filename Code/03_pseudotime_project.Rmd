@@ -266,11 +266,6 @@ cds <- reduce_dimension(
 #cluster cells
 cds <- cluster_cells(cds, resolution = 1e-1,
                      k = 10)
-
-#plot cells
-
-
-#learn graph?
 cds <- learn_graph(cds)
 
 plot_cells(cds, color_cells_by = "gate",
@@ -307,9 +302,15 @@ plot_cells(sub_cds, color_cells_by = "broad",
 
 sub_cds <- order_cells(sub_cds)
 
-genes_out <- graph_test(sub_cds)
+# genes_out <- graph_test(sub_cds)
 
-TopGenes <- genes_out %>%
+genes_out_new <- graph_test(sub_cds, neighbor_graph="principal_graph", cores=8)
+saveRDS(genes_out_new, file = '/Users/Shared/GitHub/Focus I - RNA Seq Practical/Results/graphTestOut2.RDS')
+
+genes_out <- readRDS('/Users/Shared/GitHub/Focus I - RNA Seq Practical/Results/graphTestOut.RDS')
+saveRDS(genes_out, file = '/Users/Shared/GitHub/Focus I - RNA Seq Practical/Results/graphTestOut.RDS')
+
+TopGenes <- genes_out_new %>%
   filter(status == "OK") %>%
   filter(q_value > 0) %>%
   arrange(q_value) %>%
@@ -323,8 +324,7 @@ TopAltGenes <- genes_out %>%
   slice_head(n=100) %>%
   pull(gene_short_name)
 
-saveRDS(genes_out, file = '/Users/Shared/GitHub/Focus I - RNA Seq Practical/Results/graphTestOut.RDS')
-saveRDS(TopGenes, file = '/Users/Shared/GitHub/Focus I - RNA Seq Practical/Results/TopGenes.RDS')
+
 
 ```
 
@@ -333,7 +333,7 @@ saveRDS(TopGenes, file = '/Users/Shared/GitHub/Focus I - RNA Seq Practical/Resul
 
 TopGenes <- TopGenes[1:5]
 
-plot_cells(sub_cds, genes = TopAltGenes,
+plot_cells(sub_cds, genes = TopGenes,
            label_cell_groups= FALSE,
            label_groups_by_cluster = FALSE, 
            label_leaves = FALSE,
@@ -342,7 +342,7 @@ plot_cells(sub_cds, genes = TopAltGenes,
 
 gene_sub <- sub_cds[rowData(sub_cds)$gene_short_name %in% TopGenes,]
 
-plot_genes_in_pseudotime(sub_cds)
+plot_genes_in_pseudotime(gene_sub, )
 
 ```
 
