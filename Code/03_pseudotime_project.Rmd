@@ -45,6 +45,19 @@ install.packages("devtools")
 remotes::install_github("bnprks/BPCells/r")
 devtools::install_github('cole-trapnell-lab/monocle3')
 
+
+remotes::install_github("LTLA/scRNAseq")
+
+remove.packages("AnnotationHub")
+BiocManager::install("AnnotationHub", force = TRUE)
+# Delete the local AnnotationHub cache entirely
+ah_cache <- tools::R_user_dir("AnnotationHub", which = "cache")
+unlink(ah_cache, recursive = TRUE)
+
+# Same for ExperimentHub
+eh_cache <- tools::R_user_dir("ExperimentHub", which = "cache")
+unlink(eh_cache, recursive = TRUE)
+
 ```
 
 
@@ -66,18 +79,6 @@ For this tutorial, we will use the hematopoietic stem cell (HSC) dataset from [(
 ```{r message = FALSE}
 #This step can take a bit longer
 rm(list = ls())
-
-remotes::install_github("LTLA/scRNAseq")
-
-remove.packages("AnnotationHub")
-BiocManager::install("AnnotationHub", force = TRUE)
-# Delete the local AnnotationHub cache entirely
-ah_cache <- tools::R_user_dir("AnnotationHub", which = "cache")
-unlink(ah_cache, recursive = TRUE)
-
-# Same for ExperimentHub
-eh_cache <- tools::R_user_dir("ExperimentHub", which = "cache")
-unlink(eh_cache, recursive = TRUE)
 
 # Restart R, then retry
 library(scRNAseq)
@@ -235,26 +236,6 @@ rowData(cds)$gene_short_name <- rownames(seurat)
 
 ### Alternative: Manually
 
-```{r eval=FALSE}
-
-library(Matrix)
-
-# Extract components from Seurat object
-expression_matrix <- GetAssayData(seurat, assay = "RNA", layer = "counts")
-expression_matrix <- as(expression_matrix, "sparseMatrix")
-
-cell_metadata <- metadata
-gene_metadata <- data.frame(gene_short_name = rownames(expression_matrix), row.names = rownames(expression_matrix))
-
-# Create Monocle3 cell_data_set object
-cds2<- new_cell_data_set(expression_matrix,
-                         cell_metadata = cell_metadata,
-                         gene_metadata = gene_metadata)
-
-#Remove no longer necessary objects 
-rm(expression_matrix, cell_metadata, gene_metadata)
-```
-
 # Project:
 
 **Topic 3 (Groups 5 & 6): Gene expression dynamics along pseudotime**
@@ -271,18 +252,46 @@ Questions to consider:
 
 
 ```{r}
-## Preprocess
+#preprocessing
 cds <- preprocess_cds(cds, num_dim = 100)
 
-## Reduce the dimensions using UMAP
-cds <- reduce_dimension(cds)
+#reduce dimensions
+cds <- reduce_dimension(
+  cds,
+  reduction_method = "UMAP",
+  umap.min_dist = 0.1,      
+  umap.n_neighbors = 20         
+)
 
-##Cluster the cells
-cds <- cluster_cells(cds)
+#cluster cells
+cds <- cluster_cells(cds, resolution = 1e-1,
+                     k = 10)
 
+#plot cells
+
+
+#learn graph?
 cds <- learn_graph(cds)
 
-plot_cells(cds, color_cells_by = "broad")
+plot_cells(cds, color_cells_by = "gate",
+           label_cell_groups= FALSE,
+           label_groups_by_cluster = FALSE, 
+           label_leaves = FALSE,
+           cell_size = 0.5)
+
+plot_cells(cds, color_cells_by = "partition",
+           label_cell_groups= FALSE,
+           label_groups_by_cluster = FALSE, 
+           label_leaves = FALSE,
+           cell_size = 0.5)
+
+plot_cells(cds, color_cells_by = "broad",
+           label_cell_groups= FALSE,
+           label_groups_by_cluster = FALSE, 
+           label_leaves = FALSE,
+           cell_size = 0.5)
+
+sub_cds <- cds[,colData(cds)$broad %in% c("LTHSC","MPP","CMP")]
 
 ```
 
